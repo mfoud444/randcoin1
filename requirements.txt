@@ -14,3 +14,5 @@ sqlitedict==1.7.0
 unicorn-binance-websocket-api==1.34.2
 unicorn-fy==0.11.0
 itsdangerous==1.1.0
+jinja2==2.11.3
+markupsafe==1.1.1
