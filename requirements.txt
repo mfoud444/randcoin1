@@ -1,3 +1,58 @@
+------
+    > [builder 5/5] RUN pip install --upgrade pip     && pip install --prefix=/install -r /requirements.txt:
+   7.276 
+   7.276 The conflict is caused by:
+   7.276     The user requested itsdangerous==2.0.1
+   7.276     flask 1.1.4 depends on itsdangerous<2.0 and >=0.24
+   7.276 
+   7.276 To fix this you could try to:
+   7.276 1. loosen the range of package versions you've specified
+   7.276 2. remove package versions to allow pip to attempt to solve the dependency conflict
+   7.276 
+   7.279 ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
+   ------
+   Dockerfile:14
+   --------------------
+     13 |     # Upgrade pip and install dependencies
+     14 | >>> RUN pip install --upgrade pip \
+     15 | >>>     && pip install --prefix=/install -r /requirements.txt
+     16 |     
+   --------------------
+   error: failed to solve: process "/bin/sh -c pip install --upgrade pip     && pip install --prefix=/install -r /requirements.txt" did not complete successfully: exit code: 1
+
+
+# Stage 1: Build dependencies
+FROM --platform=$BUILDPLATFORM python:3.8 as builder
+
+WORKDIR /install
+
+# Install Rust (for specific libraries that need it) and update pip
+RUN apt-get update && apt-get install -y rustc \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /requirements.txt
+
+# Upgrade pip and install dependencies
+RUN pip install --upgrade pip \
+    && pip install --prefix=/install -r /requirements.txt
+
+# Stage 2: Final runtime image
+FROM python:3.8-slim
+
+WORKDIR /app
+
+# Copy installed dependencies from the builder stage
+COPY --from=builder /install /usr/local
+
+# Copy the project files
+COPY . .
+
+# Define the default command
+CMD ["python", "-m", "binance_trade_bot"]
+
+
+
 python-binance==1.0.12
 sqlalchemy==1.4.15
 schedule==1.1.0
