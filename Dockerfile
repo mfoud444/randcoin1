@@ -5,6 +5,9 @@ WORKDIR /install
 RUN apt-get update && apt-get install -y rustc
 
 COPY requirements.txt /requirements.txt
+# Update pip before installing dependencies
+RUN pip install --upgrade pip
+
 RUN pip install --prefix=/install -r /requirements.txt
 
 FROM python:3.8-slim
