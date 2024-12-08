@@ -24,5 +24,9 @@ COPY --from=builder /install /usr/local
 
 # Copy the project files
 COPY . .
-# Define the default command
-CMD ["python", "-m", "binance_trade_bot"]
+
+# Add entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
