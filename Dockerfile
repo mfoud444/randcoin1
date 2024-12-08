@@ -24,6 +24,6 @@ COPY --from=builder /install /usr/local
 
 # Copy the project files
 COPY . .
-
+EXPOSE 5123
 # Define the default command
 CMD ["python", "-m", "binance_trade_bot"]
