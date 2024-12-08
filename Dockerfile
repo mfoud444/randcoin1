@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM --platform=$BUILDPLATFORM python as builder
+FROM --platform=$BUILDPLATFORM python:3.8 as builder
 
 WORKDIR /install
 
@@ -15,7 +15,7 @@ RUN pip install --upgrade pip \
     && pip install --prefix=/install -r /requirements.txt
 
 # Stage 2: Final runtime image
-FROM python
+FROM python:3.8-slim
 
 WORKDIR /app
 
