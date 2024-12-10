@@ -124,11 +124,45 @@ def calculate_sell_quantity(symbol, buy_order):
         print(f"Error calculating sell quantity: {e}")
         return None
 
+def convert_crypto(from_asset, to_asset, from_amount):
+    try:
+        # Step 1: Get a quote
+        quote = client._request(
+            method='POST',
+            path='/sapi/v1/convert/getQuote',
+            signed=True,
+            data={
+                "fromAsset": from_asset,
+                "toAsset": to_asset,
+                "fromAmount": str(from_amount),  # Convert to string
+            }
+        )
+
+        print(f"Quote received: {quote}")
+        quote_id = quote.get("quoteId")
+        if not quote_id:
+            return {"error": "Quote ID not found in response"}
+
+        # Step 2: Accept the quote
+        conversion = client._request(
+            method='POST',
+            path='/sapi/v1/convert/acceptQuote',
+            signed=True,
+            data={
+                "quoteId": quote_id
+            }
+        )
+        print("conversion", conversion)
+
+        return conversion
+
+    except BinanceAPIException as e:
+        return {"error": str(e)}
 
 def main():
-    # logger.info("🤖 Starting Bot Rand Monitor...")
+    # print("🤖 Starting Bot Rand Monitor...")
     previous_prices = fetch_prices()
-    # logger.info("✅ Successfully fetched previous prices.")
+    # print("✅ Successfully fetched previous prices.")
 
     while True:
         time.sleep(POLL_INTERVAL)
@@ -138,15 +172,16 @@ def main():
 
         symbol, price, change = detect_positive_changes(previous_prices, current_prices)
         if symbol:
-            logger.info(f"🚀 Rapid change detected: {symbol}, Price: {price:.6f}, Change: {change:.2%}")
+            print(f"🚀 Rapid change detected: {symbol}, Price: {price:.6f}, Change: {change:.2%}")
 
             quantity = calculate_quantity(symbol, BUY_AMOUNT_USDT)
             if quantity is None:
-                logger.error(f"❌ Error calculating quantity for {symbol}. Skipping...")
+                print(f"❌ Error calculating quantity for {symbol}. Skipping...")
                 continue
+     
 
-            buy_order = place_order(symbol, 'BUY', quantity)
-            sell_quantity = calculate_sell_quantity(symbol, buy_order)
+            buy_order = convert_crypto(from_asset="USDT", to_asset=symbol[:-4], from_amount=100)#place_order(symbol, 'BUY', quantity)
+            # sell_quantity = calculate_sell_quantity(symbol, buy_order)
             if buy_order:
                 buy_price = price
                 maker_fee, taker_fee = get_trading_fees(symbol)
@@ -166,13 +201,14 @@ def main():
                     f"    Target Price: {target_price:.8f}\n"
                     f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
                 )
-                logger.info(trade_info)
+                print(trade_info)
                 sell_price = monitor_for_target(symbol, buy_price, target_price)
-                sell_order = place_order(symbol, 'SELL', sell_quantity)
+                sell_order = convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)#place_order(symbol, 'SELL', sell_quantity)
                 if sell_order:
-                    logger.info(f"💰 Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
+                    print(f"💰 Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
                     previous_prices = fetch_prices()
         previous_prices = fetch_prices()
+
 
 
 
