@@ -16,7 +16,6 @@ client = Client(api_key=API_KEY, api_secret=API_SECRET)
 
 
 def fetch_prices():
-    """Fetches the latest prices for all Binance Futures coins."""
     try:
         prices = client.futures_symbol_ticker()
         return {item['symbol']: float(item['price']) for item in prices}
@@ -26,7 +25,6 @@ def fetch_prices():
 
 
 def detect_positive_changes(previous_prices, current_prices):
-    """Detects coins with positive price changes exceeding the threshold."""
     for symbol, current_price in current_prices.items():
         if symbol in previous_prices:
             previous_price = previous_prices[symbol]
@@ -49,17 +47,12 @@ def get_trading_fees(symbol):
 
 
 def calculate_adjusted_target_profit(buy_price, maker_fee, taker_fee):
-    """
-    Calculates the adjusted target price to achieve the net target profit after fees.
-    Fees are applied on both buy and sell orders.
-    """
-    total_fee_percentage = maker_fee + taker_fee  # Assume worst case (taker fees both times)
+    total_fee_percentage = maker_fee + taker_fee 
     adjusted_profit_multiplier = (1 + NET_TARGET_PROFIT + total_fee_percentage)
     return buy_price * adjusted_profit_multiplier
 
 
 def calculate_quantity(symbol, usdt_amount):
-    """Calculate the quantity for an order based on USDT amount and symbol price."""
     try:
         # Fetch current price of the symbol
         price = float(client.futures_symbol_ticker(symbol=symbol)['price'])
@@ -93,17 +86,6 @@ def place_order(symbol, side, quantity):
             type='MARKET',
             quantity=quantity
         )
-        # Format the order details in a more readable way
-        order_details = (
-            f"✅ {side} Order Details:\n"
-            f"    Symbol: {order['symbol']}\n"
-            f"    Price: {float(order['fills'][0]['price']):.8f}\n"
-            f"    Quantity: {order['executedQty']}\n"
-            f"    Total Value: {float(order['cummulativeQuoteQty']):.8f} USDT\n"
-            f"    Commission: {order['fills'][0]['commission']} {order['fills'][0]['commissionAsset']}\n"
-            f"    Status: {order['status']}"
-        )
-        logger.info(order_details)
         return order
     except Exception as e:
         logger.error(f"❌ Error placing {side} order: {e}")
@@ -111,15 +93,6 @@ def place_order(symbol, side, quantity):
 
 
 def monitor_for_target(symbol, buy_price, target_price):
-    trade_info = (
-        f"👀 Trade Monitor:\n"
-        f"    Symbol: {symbol}\n"
-        f"    Buy Price: {buy_price:.8f}\n"
-        f"    Target Price: {target_price:.8f}\n"
-        f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
-    )
-    logger.info(trade_info)
-    
     while True:
         time.sleep(POLL_INTERVAL)
         try:
@@ -133,18 +106,10 @@ def monitor_for_target(symbol, buy_price, target_price):
 
 
 def calculate_sell_quantity(symbol, buy_order):
-    """Calculate the quantity to sell based on the executed quantity after the buy order, adjusted for LOT_SIZE."""
     try:
-        # Extract the executed quantity from the buy order
         executed_qty = float(buy_order['executedQty'])
-        
-        # Extract the commission from the buy order (in terms of coin)
         commission_qty = float(buy_order['fills'][0]['commission'])
-        
-        # The actual quantity of coins after commission deduction
         actual_qty = executed_qty - commission_qty
-        
-        # Fetch symbol-specific LOT_SIZE info
         exchange_info = client.futures_exchange_info()
         lot_size_filter = next(
             f for f in next(s for s in exchange_info['symbols'] if s['symbol'] == symbol)['filters']
@@ -153,10 +118,7 @@ def calculate_sell_quantity(symbol, buy_order):
         
         min_qty = float(lot_size_filter['minQty'])
         step_size = float(lot_size_filter['stepSize'])
-        
-        # Adjust the quantity to meet the LOT_SIZE filter
         adjusted_qty = max(min_qty, (actual_qty // step_size) * step_size)
-
         return adjusted_qty
     except Exception as e:
         print(f"Error calculating sell quantity: {e}")
@@ -189,6 +151,22 @@ def main():
                 buy_price = price
                 maker_fee, taker_fee = get_trading_fees(symbol)
                 target_price = calculate_adjusted_target_profit(buy_price, maker_fee, taker_fee)
+
+                trade_info = (
+                           f"✅ BUY Order Details:\n"
+            f"    Symbol: {buy_order['symbol']}\n"
+            f"    Price: {float(buy_order['fills'][0]['price']):.8f}\n"
+            f"    Quantity: {buy_order['executedQty']}\n"
+            f"    Total Value: {float(buy_order['cummulativeQuoteQty']):.8f} USDT\n"
+            f"    Commission: {buy_order['fills'][0]['commission']} {buy_order['fills'][0]['commissionAsset']}\n"
+            f"    Status: {buy_order['status']}\n"
+                    f"👀 Trade Monitor:\n"
+                    f"    Symbol: {symbol}\n"
+                    f"    Buy Price: {buy_price:.8f}\n"
+                    f"    Target Price: {target_price:.8f}\n"
+                    f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
+                )
+                logger.info(trade_info)
                 sell_price = monitor_for_target(symbol, buy_price, target_price)
                 sell_order = place_order(symbol, 'SELL', sell_quantity)
                 if sell_order:
