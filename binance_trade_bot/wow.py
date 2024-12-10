@@ -93,7 +93,17 @@ def place_order(symbol, side, quantity):
             type='MARKET',
             quantity=quantity
         )
-        logger.info(f"✅ {side} order placed: {order}")
+        # Format the order details in a more readable way
+        order_details = (
+            f"✅ {side} Order Details:\n"
+            f"    Symbol: {order['symbol']}\n"
+            f"    Price: {float(order['fills'][0]['price']):.8f}\n"
+            f"    Quantity: {order['executedQty']}\n"
+            f"    Total Value: {float(order['cummulativeQuoteQty']):.8f} USDT\n"
+            f"    Commission: {order['fills'][0]['commission']} {order['fills'][0]['commissionAsset']}\n"
+            f"    Status: {order['status']}"
+        )
+        logger.info(order_details)
         return order
     except Exception as e:
         logger.error(f"❌ Error placing {side} order: {e}")
@@ -101,10 +111,15 @@ def place_order(symbol, side, quantity):
 
 
 def monitor_for_target(symbol, buy_price, target_price):
-    logger.info(f"👀 Monitoring {symbol} for target profit...")
-    logger.info(f"💵 Buy Price: {buy_price:.6f}")
-    logger.info(f"🎯 Adjusted Target Price: {target_price:.6f}")
-
+    trade_info = (
+        f"👀 Trade Monitor:\n"
+        f"    Symbol: {symbol}\n"
+        f"    Buy Price: {buy_price:.8f}\n"
+        f"    Target Price: {target_price:.8f}\n"
+        f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
+    )
+    logger.info(trade_info)
+    
     while True:
         time.sleep(POLL_INTERVAL)
         try:
@@ -149,9 +164,9 @@ def calculate_sell_quantity(symbol, buy_order):
 
 
 def main():
-    logger.info("🤖 Starting Bot Rand Monitor...")
+    # logger.info("🤖 Starting Bot Rand Monitor...")
     previous_prices = fetch_prices()
-    logger.info("✅ Successfully fetched previous prices.")
+    # logger.info("✅ Successfully fetched previous prices.")
 
     while True:
         time.sleep(POLL_INTERVAL)
