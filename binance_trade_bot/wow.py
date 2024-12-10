@@ -138,7 +138,7 @@ def convert_crypto(from_asset, to_asset, from_amount):
             }
         )
 
-        print(f"Quote received: {quote}")
+        logger.info(f"Quote received: {quote}")
         quote_id = quote.get("quoteId")
         if not quote_id:
             return {"error": "Quote ID not found in response"}
@@ -152,7 +152,7 @@ def convert_crypto(from_asset, to_asset, from_amount):
                 "quoteId": quote_id
             }
         )
-        print("conversion", conversion)
+        logger.info("conversion", conversion)
 
         return conversion
 
@@ -172,7 +172,7 @@ def main():
 
         symbol, price, change = detect_positive_changes(previous_prices, current_prices)
         if symbol:
-            print(f"🚀 Rapid change detected: {symbol}, Price: {price:.6f}, Change: {change:.2%}")
+            logger.info(f"🚀 Rapid change detected: {symbol}, Price: {price:.6f}, Change: {change:.2%}")
 
             quantity = calculate_quantity(symbol, BUY_AMOUNT_USDT)
             if quantity is None:
@@ -201,11 +201,11 @@ def main():
                     f"    Target Price: {target_price:.8f}\n"
                     f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
                 )
-                print(trade_info)
+                logger.info(trade_info)
                 sell_price = monitor_for_target(symbol, buy_price, target_price)
                 sell_order = convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)#place_order(symbol, 'SELL', sell_quantity)
                 if sell_order:
-                    print(f"💰 Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
+                    logger.info(f"💰 Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
                     previous_prices = fetch_prices()
         previous_prices = fetch_prices()
 
