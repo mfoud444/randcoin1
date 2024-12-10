@@ -129,7 +129,7 @@ def convert_crypto(from_asset, to_asset, from_amount):
         # Step 1: Get a quote
         quote = client._request(
             method='POST',
-            path='/sapi/v1/convert/getQuote',
+            uri='/sapi/v1/convert/getQuote',
             signed=True,
             data={
                 "fromAsset": from_asset,
@@ -146,7 +146,7 @@ def convert_crypto(from_asset, to_asset, from_amount):
         # Step 2: Accept the quote
         conversion = client._request(
             method='POST',
-            path='/sapi/v1/convert/acceptQuote',
+            uri='/sapi/v1/convert/acceptQuote',
             signed=True,
             data={
                 "quoteId": quote_id
