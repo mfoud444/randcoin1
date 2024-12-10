@@ -22,8 +22,8 @@ class BinanceTradeConfiguration:
                  api_key: str, 
                  api_secret: str, 
                  poll_interval: int = 2,
-                 threshold: float = 0.005,
-                 net_target_profit: float = 0.005,
+                 threshold: float = 0.003,
+                 net_target_profit: float = 0.001,
                  buy_amount_usdt: float = 7):
         self.API_KEY = api_key
         self.API_SECRET = api_secret
@@ -138,18 +138,45 @@ class TradeExecutor:
         except Exception as e:
             self.logger.error(f"Error placing {side} order: {e}")
             return None
-    def place_order_sell(self, symbol: str, side: str, quantity: float):
+    def place_order_sell(self, symbol: str, side: str):
         try:
-            self.logger.info(f"Placing {side} order - Quantity: {quantity}")
-            order = self.client.create_order(
-                symbol=symbol,
-                side=side,
-                type='MARKET',
-            )
-            return order
+            # Fetch available free balance for the asset
+            free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
+
+            # Fetch LOT_SIZE filter for the symbol
+            info = self.client.get_symbol_info(symbol)
+            lot_size_filter = next(f for f in info['filters'] if f['filterType'] == 'LOT_SIZE')
+            min_qty = float(lot_size_filter['minQty'])
+            max_qty = float(lot_size_filter['maxQty'])
+            step_size = float(lot_size_filter['stepSize'])
+
+            while free >= min_qty:
+                # Adjust quantity to match step size
+                quantity = min(max_qty, free)
+                quantity = quantity - (quantity % step_size)  # Align with step size
+
+                if quantity < min_qty:
+                    self.logger.warning(f"Adjusted quantity {quantity} is below minQty for {symbol}. Ending sell attempts.")
+                    break
+
+                # Place the sell order
+                self.logger.info(f"Placing {side} order for {symbol} - Quantity: {quantity}")
+                order = self.client.order_market_sell(
+                    symbol=symbol,
+                    quantity=quantity
+                )
+                self.logger.info(f"Sell order successful: {order}")
+
+                # Update the free balance after the sell
+                free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
+            
+            self.logger.info(f"Finished selling all available {symbol}. Remaining balance: {free}")
+            return True
+
         except Exception as e:
-            self.logger.error(f"Error placing {side} order: {e}")
+            self.logger.error(f"Error placing {side} order for {symbol}: {e}")
             return None
+
     def _generate_signature(self, query_string: str, secret_key: str) -> str:
 
         return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
@@ -262,6 +289,8 @@ class TradingBot:
                 break
 
     def run(self):
+        # sell_order = self.trade_executor.place_order_sell("MOVEUSDT", 'SELL')
+        
         previous_prices = self.binance_client.fetch_prices()
 
         while True:
@@ -287,24 +316,24 @@ class TradingBot:
                     maker_fee, taker_fee = self.binance_client.get_trading_fees(symbol)
                     target_price = self.trade_analyzer.calculate_adjusted_target_profit(buy_price, maker_fee, taker_fee)
 
-                    # trade_info = (
-                    #     f"BUY Order Details:\n"
-                    #     f"    Symbol: {buy_order['symbol']}\n"
-                    #     f"    Price: {float(buy_order['fills'][0]['price']):.8f}\n"
-                    #     f"    Quantity: {buy_order['executedQty']}\n"
-                    #     f"    Total Value: {float(buy_order['cummulativeQuoteQty']):.8f} USDT\n"
-                    #     f"    Commission: {buy_order['fills'][0]['commission']} {buy_order['fills'][0]['commissionAsset']}\n"
-                    #     f"    Status: {buy_order['status']}\n"
-                    #     f"Trade Monitor:\n"
-                    #     f"    Symbol: {symbol}\n"
-                    #     f"    Buy Price: {buy_price:.8f}\n"
-                    #     f"    Target Price: {target_price:.8f}\n"
-                    #     f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
-                    # )
-                    # self.logger.info(trade_info)
+                    trade_info = (
+                        f"BUY Order Details:\n"
+                        f"    Symbol: {buy_order['symbol']}\n"
+                        f"    Price: {float(buy_order['fills'][0]['price']):.8f}\n"
+                        f"    Quantity: {buy_order['executedQty']}\n"
+                        f"    Total Value: {float(buy_order['cummulativeQuoteQty']):.8f} USDT\n"
+                        f"    Commission: {buy_order['fills'][0]['commission']} {buy_order['fills'][0]['commissionAsset']}\n"
+                        f"    Status: {buy_order['status']}\n"
+                        f"Trade Monitor:\n"
+                        f"    Symbol: {symbol}\n"
+                        f"    Buy Price: {buy_price:.8f}\n"
+                        f"    Target Price: {target_price:.8f}\n"
+                        f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
+                    )
+                    self.logger.info(trade_info)
 
                     sell_price = self.monitor_for_target(symbol, buy_price, target_price)
-                    sell_order = self.trade_executor.place_order_sell(symbol, 'SELL', sell_quantity)#self.trade_executor.convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)
+                    sell_order = self.trade_executor.place_order_sell(symbol, 'SELL')#self.trade_executor.convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)
                     if sell_order:
                         self.logger.info(f"Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
                         previous_prices = self.binance_client.fetch_prices()
