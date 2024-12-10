@@ -51,7 +51,7 @@ class MockBinanceManager(BinanceAPIManager):
             if end_date > datetime.now():
                 end_date = datetime.now()
             end_date = end_date.strftime("%d %b %Y %H:%M:%S")
-            self.logger.info(f"Fetching prices for {ticker_symbol} between {self.datetime} and {end_date}")
+            # self.logger.info(f"Fetching prices for {ticker_symbol} between {self.datetime} and {end_date}")
             for result in self.binance_client.get_historical_klines(
                 ticker_symbol, "1m", target_date, end_date, limit=1000
             ):
@@ -81,10 +81,10 @@ class MockBinanceManager(BinanceAPIManager):
         self.balances[origin_symbol] = self.balances.get(origin_symbol, 0) + order_quantity * (
             1 - self.get_fee(origin_coin, target_coin, False)
         )
-        self.logger.info(
-            f"Bought {origin_symbol}, balance now: {self.balances[origin_symbol]} - bridge: "
-            f"{self.balances[target_symbol]}"
-        )
+        # self.logger.info(
+        #     f"Bought {origin_symbol}, balance now: {self.balances[origin_symbol]} - bridge: "
+        #     f"{self.balances[target_symbol]}"
+        # )
 
         event = defaultdict(
             lambda: None,
