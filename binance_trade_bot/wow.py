@@ -6,24 +6,24 @@ import requests
 import requests
 import hmac
 import hashlib
-
+from .logger import Logger
 import urllib
-class Logger:
-    @staticmethod
-    def info(message: str) -> None:
-        print(f"ℹ️ {message}")
+# class Logger:
+#     @staticmethod
+#     def info(message: str) -> None:
+#         print(f"ℹ️ {message}")
 
-    @staticmethod
-    def error(message: str) -> None:
-        print(f"❌ {message}")
+#     @staticmethod
+#     def error(message: str) -> None:
+#         print(f"❌ {message}")
 
 class BinanceTradeConfiguration:
     def __init__(self, 
                  api_key: str, 
                  api_secret: str, 
                  poll_interval: int = 2,
-                 threshold: float = 0.003,
-                 net_target_profit: float = 0.001,
+                 threshold: float = 0.005,
+                 net_target_profit: float = 0.005,
                  buy_amount_usdt: float = 7):
         self.API_KEY = api_key
         self.API_SECRET = api_secret
