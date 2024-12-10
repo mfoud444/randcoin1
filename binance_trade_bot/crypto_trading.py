@@ -24,21 +24,21 @@ def main():
         logger.error(e)
         return
     coins_data = []
-    for coin in supported_coins:
-        balance = manager.get_currency_balance(coin.symbol)
-        usd_price = manager.get_ticker_price(f"{coin.symbol}{config.BRIDGE_SYMBOL}")
-        btc_price = manager.get_ticker_price(f"{coin.symbol}BTC")
+    # for coin in supported_coins:
+    #     balance = manager.get_currency_balance(coin.symbol)
+    #     usd_price = manager.get_ticker_price(f"{coin.symbol}{config.BRIDGE_SYMBOL}")
+    #     btc_price = manager.get_ticker_price(f"{coin.symbol}BTC")
         
-        coin_data = {
-            "symbol": coin.symbol,
-            "enabled": coin.enabled,
-            "balance": balance,
-            "usd_price": usd_price,
-            "btc_price": btc_price,
-            "usd_value": balance * usd_price if usd_price else None,
-            "btc_value": balance * btc_price if btc_price else None
-        }
-        coins_data.append(coin_data)
+    #     coin_data = {
+    #         "symbol": coin.symbol,
+    #         "enabled": coin.enabled,
+    #         "balance": balance,
+    #         "usd_price": usd_price,
+    #         "btc_price": btc_price,
+    #         "usd_value": balance * usd_price if usd_price else None,
+    #         "btc_value": balance * btc_price if btc_price else None
+    #     }
+    #     coins_data.append(coin_data)
             
     # strategy = get_strategy(config.STRATEGY)
     # if strategy is None:
