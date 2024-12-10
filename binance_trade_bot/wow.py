@@ -121,7 +121,7 @@ def calculate_sell_quantity(symbol, buy_order):
         adjusted_qty = max(min_qty, (actual_qty // step_size) * step_size)
         return adjusted_qty
     except Exception as e:
-        print(f"Error calculating sell quantity: {e}")
+        logger.info(f"Error calculating sell quantity: {e}")
         return None
 
 def convert_crypto(from_asset, to_asset, from_amount):
@@ -176,7 +176,7 @@ def main():
 
             quantity = calculate_quantity(symbol, BUY_AMOUNT_USDT)
             if quantity is None:
-                print(f"❌ Error calculating quantity for {symbol}. Skipping...")
+                logger.info(f"❌ Error calculating quantity for {symbol}. Skipping...")
                 continue
      
 
