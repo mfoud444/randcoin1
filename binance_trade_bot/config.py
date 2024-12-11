@@ -2,6 +2,7 @@
 import configparser
 import os
 
+# from .binance_api_manager import BinanceAPIManager
 from .models import Coin
 
 CFG_FL_NAME = "user.cfg"
@@ -24,6 +25,7 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
             "sell_timeout": "0",
             "buy_timeout": "0",
         }
+        # self.manager = binance_manager
 
         if not os.path.exists(CFG_FL_NAME):
             print("No configuration file (user.cfg) found! See README. Assuming default config...")
@@ -65,6 +67,7 @@ class Config:  # pylint: disable=too-few-public-methods,too-many-instance-attrib
                         continue
                     supported_coin_list.append(line)
         self.SUPPORTED_COIN_LIST = supported_coin_list
+        # self.SUPPORTED_COIN_LIST = binance_manager.get_all_coins()
 
         self.CURRENT_COIN_SYMBOL = os.environ.get("CURRENT_COIN_SYMBOL") or config.get(USER_CFG_SECTION, "current_coin")
 

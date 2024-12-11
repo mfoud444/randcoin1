@@ -6,16 +6,16 @@ import requests
 import requests
 import hmac
 import hashlib
-from .logger import Logger
+# from .logger import Logger
 import urllib
-# class Logger:
-#     @staticmethod
-#     def info(message: str) -> None:
-#         print(f"ℹ️ {message}")
+class Logger:
+    @staticmethod
+    def info(message: str) -> None:
+        print(f"ℹ️ {message}")
 
-#     @staticmethod
-#     def error(message: str) -> None:
-#         print(f"❌ {message}")
+    @staticmethod
+    def error(message: str) -> None:
+        print(f"❌ {message}")
 
 class BinanceTradeConfiguration:
     def __init__(self, 
@@ -24,7 +24,7 @@ class BinanceTradeConfiguration:
                  poll_interval: int = 2,
                  threshold: float = 0.005,
                  net_target_profit: float = 0.005,
-                 buy_amount_usdt: float = 8):
+                 buy_amount_usdt: float = 5):
         self.API_KEY = api_key
         self.API_SECRET = api_secret
         self.POLL_INTERVAL = poll_interval
@@ -85,6 +85,8 @@ class TradeExecutor:
         self.config = config
         self.logger = config.logger
         self.base_url = "https://api.binance.com"
+        self.trade_analyzer = TradeAnalyzer(config)
+
     def calculate_quantity(self, symbol: str, usdt_amount: float) -> Optional[float]:
         try:
             price = float(self.client.futures_symbol_ticker(symbol=symbol)['price'])
@@ -106,166 +108,72 @@ class TradeExecutor:
             self.logger.error(f"Error calculating quantity: {e}")
             return None
 
-    def calculate_sell_quantity(self, symbol, buy_order):
+    def place_order_with_oco(self, symbol: str, buy_quantity: float, target_profit_percentage: float = 0.005, stop_loss_percentage: float = 0.02):
+        """
+        Places a buy order and sets up an OCO sell order with a dynamic target price and stop-loss.
+        
+        :param symbol: The trading pair (e.g., 'BTCUSDT').
+        :param buy_quantity: The quantity to buy.
+        :param target_profit_percentage: The target profit percentage (default 0.5%).
+        :param stop_loss_percentage: The stop-loss percentage (default 2%).
+        """
         try:
-            executed_qty = float(buy_order['executedQty'])
-            commission_qty = float(buy_order['fills'][0]['commission'])
-            actual_qty = executed_qty - commission_qty
-            exchange_info = self.client.futures_exchange_info()
-            lot_size_filter = next(
-                f for f in next(s for s in exchange_info['symbols'] if s['symbol'] == symbol)['filters']
-                if f['filterType'] == 'LOT_SIZE'
-            )
-            
-            min_qty = float(lot_size_filter['minQty'])
-            step_size = float(lot_size_filter['stepSize'])
-            adjusted_qty = max(min_qty, (actual_qty // step_size) * step_size)
-            return adjusted_qty
-        except Exception as e:
-            print(f"Error calculating sell quantity: {e}")
-            return None
-
-    def place_order(self, symbol: str, side: str, quantity: float):
-        try:
-            self.logger.info(f"Placing {side} order - Quantity: {quantity}")
-            order = self.client.create_order(
+            # Place the market buy order
+            self.logger.info(f"Placing BUY order for {symbol} - Quantity: {buy_quantity}")
+            buy_order = self.client.create_order(
                 symbol=symbol,
-                side=side,
-                type='MARKET',
-                quantity=quantity
+                side="BUY",
+                type="MARKET",
+                quantity=buy_quantity
             )
-            return order
-        except Exception as e:
-            self.logger.error(f"Error placing {side} order: {e}")
-            return None
-    def place_order_sell(self, symbol: str, side: str):
-        try:
-            # Fetch available free balance for the asset
-            free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
+            self.logger.info(f"Buy order placed successfully: {buy_order}")
 
-            # Fetch LOT_SIZE filter for the symbol
-            info = self.client.get_symbol_info(symbol)
-            lot_size_filter = next(f for f in info['filters'] if f['filterType'] == 'LOT_SIZE')
-            min_qty = float(lot_size_filter['minQty'])
-            max_qty = float(lot_size_filter['maxQty'])
-            step_size = float(lot_size_filter['stepSize'])
+            # Calculate buy price from the order
+            buy_price = float(buy_order['fills'][0]['price'])
 
-            while free >= min_qty:
-                # Adjust quantity to match step size
-                quantity = min(max_qty, free)
-                quantity = quantity - (quantity % step_size)  # Align with step size
+            # Get trading fees
+            fees = self.client.get_trade_fee(symbol=symbol)
+            maker_fee = float(fees[0]['makerCommission'])
+            taker_fee = float(fees[0]['takerCommission'])
 
-                if quantity < min_qty:
-                    self.logger.warning(f"Adjusted quantity {quantity} is below minQty for {symbol}. Ending sell attempts.")
-                    break
+            # Calculate target price considering fees
+            total_fee_percentage = maker_fee + taker_fee
+            total_target_percentage = target_profit_percentage + total_fee_percentage
+            target_price = buy_price * (1 + total_target_percentage)
 
-                # Place the sell order
-                self.logger.info(f"Placing {side} order for {symbol} - Quantity: {quantity}")
-                order = self.client.order_market_sell(
-                    symbol=symbol,
-                    quantity=quantity
-                )
-                self.logger.info(f"Sell order successful: {order}")
+            # Calculate stop-loss price
+            stop_price = buy_price * (1 - stop_loss_percentage)
+            stop_limit_price = stop_price * 0.99  # Slightly lower to ensure execution
 
-                # Update the free balance after the sell
-                free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
-            
-            self.logger.info(f"Finished selling all available {symbol}. Remaining balance: {free}")
-            return True
+            # Place an OCO sell order
+            self.logger.info(f"Placing OCO SELL order for {symbol}")
+            self.logger.info(f"  Buy Price: {buy_price}")
+            self.logger.info(f"  Target Price: {target_price}")
+            self.logger.info(f"  Stop Price: {stop_price}")
+            self.logger.info(f"  Stop Limit Price: {stop_limit_price}")
 
-        except Exception as e:
-            self.logger.error(f"Error placing {side} order for {symbol}: {e}")
-            return None
+            oco_order = self.client.create_oco_order(
+                symbol=symbol,
+                side="SELL",
+                quantity=buy_quantity,
+                price=target_price,  # Take-profit price
+                # stopPrice=stop_price,  # Stop-loss trigger price
+                # stopLimitPrice=stop_limit_price,  # Stop-limit order price
+                # stopLimitTimeInForce="GTC"
+            )
+            self.logger.info(f"OCO sell order placed successfully: {oco_order}")
 
-    def _generate_signature(self, query_string: str, secret_key: str) -> str:
-
-        return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
-
-    def validate_conversion_assets(self, from_asset: str, to_asset: str) -> bool:
-        """
-        Validate if the assets are supported for conversion
-        Add more sophisticated validation if needed
-        """
-        # List of known convertible assets
-        convertible_assets = ['USDT', 'BTC', 'ETH', 'BNB']
-        return from_asset in convertible_assets and to_asset in convertible_assets
-
-    def convert_crypto(self, from_asset: str, to_asset: str, from_amount: float) -> Dict:
-        try:
-            if from_amount <= 0:
-                self.logger.error(f"Invalid conversion amount: {from_amount}")
-                return {"error": "Invalid conversion amount"}
-
-            session = requests.Session()
-            timestamp = int(time.time() * 1000)
-            
-            quote_params = {
-                "fromAsset": from_asset,
-                "toAsset": to_asset,
-                "fromAmount": f"{from_amount:.2f}",  # Ensure 2 decimal precision
-                "timestamp": timestamp
+            return {
+                "buy_order": buy_order, 
+                "oco_order": oco_order,
+                "buy_price": buy_price,
+                "target_price": target_price,
+                "stop_price": stop_price
             }
 
-            query_string = "&".join([f"{key}={value}" for key, value in sorted(quote_params.items())])
-            signature = self._generate_signature(query_string, self.config.API_SECRET)
-            
-            headers = {"X-MBX-APIKEY": self.config.API_KEY}
-            quote_params["signature"] = signature
-
-            quote_url = f"{self.base_url}/sapi/v1/convert/getQuote"
-            
-            self.logger.info(f"Requesting quote: {quote_params}")
-            
-            quote_response = session.post(quote_url, params=quote_params, headers=headers)
-            
-            # Log full response for debugging
-            self.logger.info(f"Quote response status: {quote_response.status_code}")
-            self.logger.info(f"Quote response text: {quote_response.text}")
-            
-            quote_response.raise_for_status()
-            quote_data = quote_response.json()
-            
-            quote_id = quote_data.get("quoteId")
-            if not quote_id:
-                self.logger.error("No quote ID found in response")
-                return {"error": "Quote ID not found", "response": quote_data}
-
-            # Accept quote process
-            accept_params = {
-                "quoteId": quote_id,
-                "timestamp": int(time.time() * 1000)
-            }
-
-            accept_query_string = "&".join([f"{key}={value}" for key, value in sorted(accept_params.items())])
-            accept_signature = self._generate_signature(accept_query_string, self.config.API_SECRET)
-            
-            accept_params["signature"] = accept_signature
-
-            accept_url = f"{self.base_url}/sapi/v1/convert/acceptQuote"
-            
-            accept_response = session.post(accept_url, params=accept_params, headers=headers)
-            
-            # Log full accept response for debugging
-            self.logger.info(f"Accept response status: {accept_response.status_code}")
-            self.logger.info(f"Accept response text: {accept_response.text}")
-            
-            accept_response.raise_for_status()
-            conversion_data = accept_response.json()
-
-            self.logger.info(f"Conversion completed: {conversion_data}")
-            return conversion_data
-
-        except requests.exceptions.HTTPError as http_err:
-            self.logger.error(f"HTTP error during conversion: {http_err}")
-            self.logger.error(f"Response text: {http_err.response.text}")
-            return {"error": "HTTP Error", "details": str(http_err)}
-        except requests.exceptions.RequestException as req_err:
-            self.logger.error(f"Request error during conversion: {req_err}")
-            return {"error": "Request Error", "details": str(req_err)}
         except Exception as e:
-            self.logger.error(f"Unexpected error during conversion: {e}")
-            return {"error": "Unexpected Error", "details": str(e)}
-
+            self.logger.error(f"Error placing orders for {symbol}: {e}")
+            return None
 
 class TradingBot:
     def __init__(self, config: BinanceTradeConfiguration):
@@ -288,9 +196,39 @@ class TradingBot:
                 self.logger.error(f"Error fetching current price: {e}")
                 break
 
-    def run(self):
-        # sell_order = self.trade_executor.place_order_sell("MOVEUSDT", 'SELL')
+    def monitor_order_success(self, order: Dict, timeout: int = 300) -> bool:
+        """
+        Monitor the status of an order to ensure it is successfully executed.
         
+        :param order: The order dictionary from Binance API
+        :param timeout: Maximum time to wait for order confirmation (in seconds)
+        :return: True if order is successful, False otherwise
+        """
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                # Check the status of the order
+                order_status = self.trade_executor.client.get_order(
+                    symbol=order['symbol'], 
+                    orderId=order['orderId']
+                )
+                
+                if order_status['status'] in ['FILLED', 'PARTIALLY_FILLED']:
+                    self.logger.info(f"Order {order['orderId']} successfully executed")
+                    return True
+                elif order_status['status'] in ['CANCELED', 'REJECTED']:
+                    self.logger.error(f"Order {order['orderId']} was {order_status['status']}")
+                    return False
+                
+                time.sleep(self.config.POLL_INTERVAL)
+            except Exception as e:
+                self.logger.error(f"Error checking order status: {e}")
+                break
+        
+        self.logger.error(f"Order {order['orderId']} did not complete within {timeout} seconds")
+        return False
+
+    def run(self):
         previous_prices = self.binance_client.fetch_prices()
 
         while True:
@@ -309,36 +247,100 @@ class TradingBot:
                     self.logger.info(f"Error calculating quantity for {symbol}. Skipping...")
                     continue
 
-                buy_order = self.trade_executor.place_order(symbol, 'BUY', quantity) #self.trade_executor.convert_crypto(from_asset="USDT", to_asset=symbol[:-4], from_amount=100)
-                sell_quantity = self.trade_executor.calculate_sell_quantity(symbol, buy_order)
-                if buy_order:
-                    buy_price = price
-                    maker_fee, taker_fee = self.binance_client.get_trading_fees(symbol)
-                    target_price = self.trade_analyzer.calculate_adjusted_target_profit(buy_price, maker_fee, taker_fee)
+                # Place the OCO order (both buy and sell in one method)
+                oco_orders = self.trade_executor.place_order_with_oco(
+                    symbol, 
+                    quantity, 
+                )
 
-                    trade_info = (
-                        f"BUY Order Details:\n"
-                        f"    Symbol: {buy_order['symbol']}\n"
-                        f"    Price: {float(buy_order['fills'][0]['price']):.8f}\n"
-                        f"    Quantity: {buy_order['executedQty']}\n"
-                        f"    Total Value: {float(buy_order['cummulativeQuoteQty']):.8f} USDT\n"
-                        f"    Commission: {buy_order['fills'][0]['commission']} {buy_order['fills'][0]['commissionAsset']}\n"
-                        f"    Status: {buy_order['status']}\n"
-                        f"Trade Monitor:\n"
-                        f"    Symbol: {symbol}\n"
-                        f"    Buy Price: {buy_price:.8f}\n"
-                        f"    Target Price: {target_price:.8f}\n"
-                        f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
-                    )
-                    self.logger.info(trade_info)
+                if oco_orders:
+                    # Monitor buy order success
+                    if self.monitor_order_success(oco_orders['buy_order']):
+                        self.logger.info(f"Buy order for {symbol} executed successfully")
+                        
+                        # Wait and monitor sell order (take-profit or stop-loss)
+                        sell_order_success = self.monitor_order_success(oco_orders['oco_order'])
+                        
+                        if sell_order_success:
+                            self.logger.info(f"Completed trade for {symbol} successfully!")
+                        else:
+                            self.logger.warning(f"Trade for {symbol} did not complete as expected")
+                
+                previous_prices = current_prices  # Update previous prices for the next iteration
 
-                    sell_price = self.monitor_for_target(symbol, buy_price, target_price)
-                    sell_order = self.trade_executor.place_order_sell(symbol, 'SELL')#self.trade_executor.convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)
-                    if sell_order:
-                        self.logger.info(f"Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
-                        previous_prices = self.binance_client.fetch_prices()
+
+# class TradingBot:
+#     def __init__(self, config: BinanceTradeConfiguration):
+#         self.config = config
+#         self.logger = config.logger
+#         self.binance_client = BinanceClient(config)
+#         self.trade_analyzer = TradeAnalyzer(config)
+#         self.trade_executor = TradeExecutor(self.binance_client, config)
+
+#     def monitor_for_target(self, symbol: str, buy_price: float, target_price: float) -> Optional[float]:
+#         while True:
+#             time.sleep(self.config.POLL_INTERVAL)
+#             try:
+#                 current_price = float(self.binance_client.client.futures_symbol_ticker(symbol=symbol)['price'])
+#                 if (target_price > buy_price and current_price >= target_price) or \
+#                    (target_price < buy_price and current_price <= target_price):
+#                     self.logger.info(f"Target reached! Current Price: {current_price:.6f}")
+#                     return current_price
+#             except Exception as e:
+#                 self.logger.error(f"Error fetching current price: {e}")
+#                 break
+
+#     def run(self):
+#         # sell_order = self.trade_executor.place_order_sell("MOVEUSDT", 'SELL')
+        
+#         previous_prices = self.binance_client.fetch_prices()
+
+#         while True:
+#             time.sleep(self.config.POLL_INTERVAL)
+#             current_prices = self.binance_client.fetch_prices()
+#             if not current_prices:
+#                 continue
+
+#             symbol, price, change = self.trade_analyzer.detect_positive_changes(previous_prices, current_prices)
+#             if symbol:
+#                 self.logger.info(f"Rapid change detected: {symbol}, Price: {price:.6f}, Change: {change:.2%}")
+
+#                 quantity = self.trade_executor.calculate_quantity(symbol, self.config.BUY_AMOUNT_USDT)
+                
+#                 if quantity is None:
+#                     self.logger.info(f"Error calculating quantity for {symbol}. Skipping...")
+#                     continue
+
+#                 buy_order = self.trade_executor.place_order(symbol, 'BUY', quantity) #self.trade_executor.convert_crypto(from_asset="USDT", to_asset=symbol[:-4], from_amount=100)
+#                 sell_quantity = self.trade_executor.calculate_sell_quantity(symbol, buy_order)
+#                 if buy_order:
+#                     buy_price = price
+#                     maker_fee, taker_fee = self.binance_client.get_trading_fees(symbol)
+#                     target_price = self.trade_analyzer.calculate_adjusted_target_profit(buy_price, maker_fee, taker_fee)
+
+#                     trade_info = (
+#                         f"BUY Order Details:\n"
+#                         f"    Symbol: {buy_order['symbol']}\n"
+#                         f"    Price: {float(buy_order['fills'][0]['price']):.8f}\n"
+#                         f"    Quantity: {buy_order['executedQty']}\n"
+#                         f"    Total Value: {float(buy_order['cummulativeQuoteQty']):.8f} USDT\n"
+#                         f"    Commission: {buy_order['fills'][0]['commission']} {buy_order['fills'][0]['commissionAsset']}\n"
+#                         f"    Status: {buy_order['status']}\n"
+#                         f"Trade Monitor:\n"
+#                         f"    Symbol: {symbol}\n"
+#                         f"    Buy Price: {buy_price:.8f}\n"
+#                         f"    Target Price: {target_price:.8f}\n"
+#                         f"    Expected Profit: {((target_price - buy_price) / buy_price * 100):.2f}%"
+#                     )
+#                     self.logger.info(trade_info)
+
+#                     sell_price = self.monitor_for_target(symbol, buy_price, target_price)
+#                     sell_order = self.trade_executor.place_order_sell(symbol, 'SELL')#self.trade_executor.convert_crypto(from_asset=symbol[:-4], to_asset="USDT", from_amount=100)
+#                     if sell_order:
+#                         self.logger.info(f"Sold {symbol} at {sell_price:.6f}, Target profit achieved!")
+#                         previous_prices = self.binance_client.fetch_prices()
             
-            previous_prices = self.binance_client.fetch_prices()
+#             previous_prices = self.binance_client.fetch_prices()
 
 def main():
     # You would pass actual API credentials here
@@ -351,3 +353,163 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    # def calculate_sell_quantity(self, symbol, buy_order):
+    #     try:
+    #         executed_qty = float(buy_order['executedQty'])
+    #         commission_qty = float(buy_order['fills'][0]['commission'])
+    #         actual_qty = executed_qty - commission_qty
+    #         exchange_info = self.client.futures_exchange_info()
+    #         lot_size_filter = next(
+    #             f for f in next(s for s in exchange_info['symbols'] if s['symbol'] == symbol)['filters']
+    #             if f['filterType'] == 'LOT_SIZE'
+    #         )
+            
+    #         min_qty = float(lot_size_filter['minQty'])
+    #         step_size = float(lot_size_filter['stepSize'])
+    #         adjusted_qty = max(min_qty, (actual_qty // step_size) * step_size)
+    #         return adjusted_qty
+    #     except Exception as e:
+    #         print(f"Error calculating sell quantity: {e}")
+    #         return None
+
+    # def place_order(self, symbol: str, side: str, quantity: float):
+    #     try:
+    #         self.logger.info(f"Placing {side} order - Quantity: {quantity}")
+    #         order = self.client.create_order(
+    #             symbol=symbol,
+    #             side=side,
+    #             type='MARKET',
+    #             quantity=quantity
+    #         )
+    #         return order
+    #     except Exception as e:
+    #         self.logger.error(f"Error placing {side} order: {e}")
+    #         return None
+    # def place_order_sell(self, symbol: str, side: str):
+    #     try:
+    #         # Fetch available free balance for the asset
+    #         free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
+
+    #         # Fetch LOT_SIZE filter for the symbol
+    #         info = self.client.get_symbol_info(symbol)
+    #         lot_size_filter = next(f for f in info['filters'] if f['filterType'] == 'LOT_SIZE')
+    #         min_qty = float(lot_size_filter['minQty'])
+    #         max_qty = float(lot_size_filter['maxQty'])
+    #         step_size = float(lot_size_filter['stepSize'])
+
+    #         while free >= min_qty:
+    #             # Adjust quantity to match step size
+    #             quantity = min(max_qty, free)
+    #             quantity = quantity - (quantity % step_size)  # Align with step size
+
+    #             if quantity < min_qty:
+    #                 self.logger.warning(f"Adjusted quantity {quantity} is below minQty for {symbol}. Ending sell attempts.")
+    #                 break
+
+    #             # Place the sell order
+    #             self.logger.info(f"Placing {side} order for {symbol} - Quantity: {quantity}")
+    #             order = self.client.order_market_sell(
+    #                 symbol=symbol,
+    #                 quantity=quantity
+    #             )
+    #             self.logger.info(f"Sell order successful: {order}")
+
+    #             # Update the free balance after the sell
+    #             free = float(self.client.get_asset_balance(asset=symbol[:-4])['free'])
+            
+    #         self.logger.info(f"Finished selling all available {symbol}. Remaining balance: {free}")
+    #         return True
+
+    #     except Exception as e:
+    #         self.logger.error(f"Error placing {side} order for {symbol}: {e}")
+    #         return None
+
+    # def _generate_signature(self, query_string: str, secret_key: str) -> str:
+
+    #     return hmac.new(secret_key.encode('utf-8'), query_string.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # def validate_conversion_assets(self, from_asset: str, to_asset: str) -> bool:
+    #     """
+    #     Validate if the assets are supported for conversion
+    #     Add more sophisticated validation if needed
+    #     """
+    #     # List of known convertible assets
+    #     convertible_assets = ['USDT', 'BTC', 'ETH', 'BNB']
+    #     return from_asset in convertible_assets and to_asset in convertible_assets
+
+    # def convert_crypto(self, from_asset: str, to_asset: str, from_amount: float) -> Dict:
+    #     try:
+    #         if from_amount <= 0:
+    #             self.logger.error(f"Invalid conversion amount: {from_amount}")
+    #             return {"error": "Invalid conversion amount"}
+
+    #         session = requests.Session()
+    #         timestamp = int(time.time() * 1000)
+            
+    #         quote_params = {
+    #             "fromAsset": from_asset,
+    #             "toAsset": to_asset,
+    #             "fromAmount": f"{from_amount:.2f}",  # Ensure 2 decimal precision
+    #             "timestamp": timestamp
+    #         }
+
+    #         query_string = "&".join([f"{key}={value}" for key, value in sorted(quote_params.items())])
+    #         signature = self._generate_signature(query_string, self.config.API_SECRET)
+            
+    #         headers = {"X-MBX-APIKEY": self.config.API_KEY}
+    #         quote_params["signature"] = signature
+
+    #         quote_url = f"{self.base_url}/sapi/v1/convert/getQuote"
+            
+    #         self.logger.info(f"Requesting quote: {quote_params}")
+            
+    #         quote_response = session.post(quote_url, params=quote_params, headers=headers)
+            
+    #         # Log full response for debugging
+    #         self.logger.info(f"Quote response status: {quote_response.status_code}")
+    #         self.logger.info(f"Quote response text: {quote_response.text}")
+            
+    #         quote_response.raise_for_status()
+    #         quote_data = quote_response.json()
+            
+    #         quote_id = quote_data.get("quoteId")
+    #         if not quote_id:
+    #             self.logger.error("No quote ID found in response")
+    #             return {"error": "Quote ID not found", "response": quote_data}
+
+    #         # Accept quote process
+    #         accept_params = {
+    #             "quoteId": quote_id,
+    #             "timestamp": int(time.time() * 1000)
+    #         }
+
+    #         accept_query_string = "&".join([f"{key}={value}" for key, value in sorted(accept_params.items())])
+    #         accept_signature = self._generate_signature(accept_query_string, self.config.API_SECRET)
+            
+    #         accept_params["signature"] = accept_signature
+
+    #         accept_url = f"{self.base_url}/sapi/v1/convert/acceptQuote"
+            
+    #         accept_response = session.post(accept_url, params=accept_params, headers=headers)
+            
+    #         # Log full accept response for debugging
+    #         self.logger.info(f"Accept response status: {accept_response.status_code}")
+    #         self.logger.info(f"Accept response text: {accept_response.text}")
+            
+    #         accept_response.raise_for_status()
+    #         conversion_data = accept_response.json()
+
+    #         self.logger.info(f"Conversion completed: {conversion_data}")
+    #         return conversion_data
+
+    #     except requests.exceptions.HTTPError as http_err:
+    #         self.logger.error(f"HTTP error during conversion: {http_err}")
+    #         self.logger.error(f"Response text: {http_err.response.text}")
+    #         return {"error": "HTTP Error", "details": str(http_err)}
+    #     except requests.exceptions.RequestException as req_err:
+    #         self.logger.error(f"Request error during conversion: {req_err}")
+    #         return {"error": "Request Error", "details": str(req_err)}
+    #     except Exception as e:
+    #         self.logger.error(f"Unexpected error during conversion: {e}")
+    #         return {"error": "Unexpected Error", "details": str(e)}

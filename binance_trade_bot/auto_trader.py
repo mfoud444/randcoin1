@@ -1,3 +1,5 @@
+What is the principle that selects the best currency in the mountain below?
+
 from datetime import datetime
 from typing import Dict, List
 

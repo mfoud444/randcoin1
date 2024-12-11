@@ -363,3 +363,29 @@ class BinanceAPIManager:
         trade_log.set_complete(order.cumulative_quote_qty)
 
         return order
+    
+    def get_all_coins(self):
+        """
+        Retrieve all unique coins available on Binance.
+        """
+        try:
+            # Fetch exchange information for all symbols
+            exchange_info = self.binance_client.get_exchange_info()
+            symbols = exchange_info['symbols']
+            
+            # Use a set to collect unique coins
+            coins = set()
+            for symbol in symbols:
+                coins.add(symbol['baseAsset'])
+                coins.add(symbol['quoteAsset'])
+            
+            # Log the results
+            self.logger.info(f"Retrieved {len(coins)} unique coins.")
+            return sorted(coins)  # Return sorted list of coins
+        except BinanceAPIException as e:
+            self.logger.error(f"Error fetching coins: {e}")
+            return []
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            return []
+
