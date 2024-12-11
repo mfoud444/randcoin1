@@ -23,8 +23,8 @@ class BinanceTradeConfiguration:
                  api_secret: str, 
                  poll_interval: int = 2,
                  threshold: float = 0.005,
-                 net_target_profit: float = 0.003,
-                 buy_amount_usdt: float = 7):
+                 net_target_profit: float = 0.005,
+                 buy_amount_usdt: float = 8):
         self.API_KEY = api_key
         self.API_SECRET = api_secret
         self.POLL_INTERVAL = poll_interval
