@@ -2,6 +2,7 @@ from binance.client import Client
 import time
 from .logger import Logger
 import math
+from typing import Dict, Optional, Tuple
 # Reuse the get_fastest_movers() function here
 from concurrent.futures import ThreadPoolExecutor, as_completed
 TRADE_AMOUNT_USDT = 5.5  # Amount to trade in USDT
@@ -67,7 +68,7 @@ def adjust_price(price, tick_size):
 
 def trade_fastest_currency():
     # Step 1: Identify the fastest-growing currency
-    fastest_movers = get_fastest_movers()  # Reuse the function from the previous script
+    fastest_movers = run()  # Reuse the function from the previous script
     if not fastest_movers:
         logger.info("No fast movers found.")
         return
@@ -137,7 +138,39 @@ def trade_fastest_currency():
         logger.info(f"Error during trading: {e}")
 
 
+def detect_positive_changes(
+                            previous_prices, 
+                            current_prices):
+    for symbol, current_price in current_prices.items():
+        if symbol in previous_prices:
+            previous_price = previous_prices[symbol]
+            if previous_price > 0:
+                change = (current_price - previous_price) / previous_price
+                if change > 1:
+                    logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
+                    return symbol, current_price, change
+    return None, None, None
 
+def fetch_prices() -> Dict[str, float]:
+    try:
+        prices = client.futures_symbol_ticker()
+        return {item['symbol']: float(item['price']) for item in prices}
+    except Exception as e:
+        logger.error(f"Error fetching prices: {e}")
+        return {}
+
+
+def run():
+    previous_prices =fetch_prices()
+
+    while True:
+        time.sleep(2)
+        current_prices = fetch_prices()
+        if not current_prices:
+            continue
+
+        symbol, price, change = detect_positive_changes(previous_prices, current_prices)
+        return [{'symbol': symbol, 'change': change}]
 def fetch_mover_data(symbol):
     """Fetch the price change data for a single symbol."""
     try:
