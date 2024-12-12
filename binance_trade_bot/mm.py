@@ -190,11 +190,11 @@ def fetch_mover_data(symbol):
         ticker = client.get_ticker(symbol=symbol)
         last_price = float(ticker['lastPrice'])
         percent_change = ((last_price - start_price) / start_price) * 100
-        # logger.info(f"symbloy:{symbol}percent change:{percent_change}")
+        print(f"symbloy:{symbol}percent change:{percent_change}")
         if percent_change >= 1:
             return {'symbol': symbol, 'change': percent_change}
     except Exception as e:
-        logger.info(f"Error fetching data for {symbol}: {e}")
+        print(f"Error fetching data for {symbol}: {e}")
     return None
 
 def get_fastest_movers():
@@ -202,7 +202,7 @@ def get_fastest_movers():
     usdt_symbols = [ticker['symbol'] for ticker in tickers if ticker['symbol'].endswith('USDT')]
 
     movers = []
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         # Create futures for each symbol
         futures = {executor.submit(fetch_mover_data, symbol): symbol for symbol in usdt_symbols}
 
@@ -212,7 +212,7 @@ def get_fastest_movers():
                 movers.append(result)
 
     movers.sort(key=lambda x: x['change'], reverse=True)
-    logger.info(movers)
+    print(movers)
     return movers
 
 def main():
