@@ -146,6 +146,7 @@ def detect_positive_changes(
             previous_price = previous_prices[symbol]
             if previous_price > 0:
                 change = (current_price - previous_price) / previous_price
+                logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
                 if change > 1:
                     logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
                     return symbol, current_price, change
