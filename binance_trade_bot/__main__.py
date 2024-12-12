@@ -1,6 +1,7 @@
 import threading
-from .crypto_trading import main
+# from .crypto_trading import main
 # from .wow import main
+from .mm import main
 from .api_server import run_api_server
 
 if __name__ == "__main__":
