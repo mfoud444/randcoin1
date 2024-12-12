@@ -151,26 +151,38 @@ def detect_positive_changes(
                     return symbol, current_price, change
     return None, None, None
 
-def fetch_prices() -> Dict[str, float]:
+def fetch_prices():
+    """Fetch the current prices of symbols."""
     try:
-        prices = client.futures_symbol_ticker()
-        return {item['symbol']: float(item['price']) for item in prices}
+        tickers = client.get_ticker()
+        # Fetch a list of symbols with their prices (assuming they end with 'USDT')
+        prices = []
+        for ticker in tickers:
+            if ticker['symbol'].endswith('USDT'):
+                symbol = ticker['symbol']
+                price = float(ticker['lastPrice'])
+                prices.append({'symbol': symbol, 'price': price})
+        return prices
     except Exception as e:
-        logger.error(f"Error fetching prices: {e}")
-        return {}
+        logger.info(f"Error fetching prices: {e}")
+        return []
 
 
 def run():
-    previous_prices =fetch_prices()
+    previous_prices = fetch_prices()
 
     while True:
         time.sleep(2)
         current_prices = fetch_prices()
+
         if not current_prices:
             continue
 
         symbol, price, change = detect_positive_changes(previous_prices, current_prices)
-        return [{'symbol': symbol, 'change': change}]
+        if symbol:  # If a symbol is found with positive change
+            return [{'symbol': symbol, 'change': change}]
+        
+        previous_prices = current_prices 
 def fetch_mover_data(symbol):
     """Fetch the price change data for a single symbol."""
     try:
