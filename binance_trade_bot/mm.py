@@ -181,9 +181,7 @@ def run():
         if symbol:  # If a symbol is found with positive change
             return [{'symbol': symbol, 'change': change}]
             
-        
-        
-        previous_prices = current_prices 
+
 # def fetch_mover_data(symbol):
 #     """Fetch the price change data for a single symbol."""
 #     try:
