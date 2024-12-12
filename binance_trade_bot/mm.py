@@ -6,7 +6,7 @@ from typing import Dict, Optional, Tuple
 # Reuse the get_fastest_movers() function here
 from concurrent.futures import ThreadPoolExecutor, as_completed
 TRADE_AMOUNT_USDT = 5.5  # Amount to trade in USDT
-PROFIT_TARGET = 0.005  # 5% profit target
+PROFIT_TARGET = 0.01  # 5% profit target
 TRADING_FEE = 0.001  # 0.1% per trade
 MONITOR_TIME=10
 # Set up your Binance API keys
