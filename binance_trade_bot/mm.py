@@ -65,16 +65,7 @@ def get_price_filter_constraints(symbol):
 def adjust_price(price, tick_size):
     """Adjust the price to comply with the PRICE_FILTER tick size."""
     return round(price // tick_size * tick_size, int(-1 * round(math.log10(tick_size))))
-ng loop: 'list' object has no attribute 'items'
-2024-12-12 20:34:58,655 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:01,450 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:04,159 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:07,256 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:10,352 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:13,452 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:16,256 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:19,055 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
-2024-12-12 20:35:21,751 - crypto_trading_logger - INFO - An error occurred in the trading loop: 'list' object has no attribute 'items'
+
 def trade_fastest_currency():
     # Step 1: Identify the fastest-growing currency
     fastest_movers = run()  # Reuse the function from the previous script
