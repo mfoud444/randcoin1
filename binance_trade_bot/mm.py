@@ -20,11 +20,12 @@ def monitor_sell_order(symbol, order_id):
         while True:
             # Fetch the order status
             order_status = client.get_order(symbol=symbol, orderId=order_id)
-            logger.info(f"Monitoring sell order {order_id}: Status {order_status['status']}")
+            # logger.info(f"Monitoring sell order {order_id}: Status {order_status['status']}")
             
             # Check if the order is filled
             if order_status['status'] == 'FILLED':
                 logger.info(f"Sell order {order_id} for {symbol} is filled.")
+                logger.info(f"Monitoring sell order {order_id}: Status {order_status['status']}")
                 trade_fastest_currency()  # Restart trading
                 break
 
@@ -145,7 +146,7 @@ def fetch_mover_data(symbol):
         ticker = client.get_ticker(symbol=symbol)
         last_price = float(ticker['lastPrice'])
         percent_change = ((last_price - start_price) / start_price) * 100
-        logger.info(f"symbloy:{symbol}percent change:{percent_change}")
+        # logger.info(f"symbloy:{symbol}percent change:{percent_change}")
         if percent_change >= 1:
             return {'symbol': symbol, 'change': percent_change}
     except Exception as e:
@@ -171,12 +172,13 @@ def get_fastest_movers():
     return movers
 
 def main():
-    while True:
-        try:
-            # Execute the trading function
-            trade_fastest_currency()
-        except Exception as e:
-            logger.info(f"An error occurred in the trading loop: {e}")
+    trade_fastest_currency()
+    # while True:
+    #     try:
+    #         # Execute the trading function
+    #         trade_fastest_currency()
+    #     except Exception as e:
+    #         logger.info(f"An error occurred in the trading loop: {e}")
 # Execute the trading function
 if __name__ == "__main__":
     main()
