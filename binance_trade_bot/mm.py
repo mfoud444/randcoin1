@@ -66,16 +66,16 @@ def adjust_price(price, tick_size):
     """Adjust the price to comply with the PRICE_FILTER tick size."""
     return round(price // tick_size * tick_size, int(-1 * round(math.log10(tick_size))))
 
-def trade_fastest_currency():
+def trade_fastest_currency(symbol):
     # Step 1: Identify the fastest-growing currency
-    fastest_movers = get_fastest_movers()  # Reuse the function from the previous script
-    if not fastest_movers:
-        logger.info("No fast movers found.")
-        return
+    # fastest_movers = get_fastest_movers()  # Reuse the function from the previous script
+    # if not fastest_movers:
+    #     logger.info("No fast movers found.")
+    #     return
 
     # Pick the top currency
-    fastest_currency = fastest_movers[0]
-    symbol = fastest_currency['symbol']
+    # fastest_currency = fastest_movers[0]
+    # symbol = fastest_currency['symbol']
     logger.info(f"Trading the fastest currency: {symbol}")
 
     # Step 2: Place a market buy order
@@ -171,15 +171,20 @@ def run():
     previous_prices = fetch_prices()
 
     while True:
-        time.sleep(2)
-        current_prices = fetch_prices()
+        try:
+            time.sleep(2)
+            current_prices = fetch_prices()
 
-        if not current_prices:
-            continue
+            if not current_prices:
+                continue
 
-        symbol, price, change = detect_positive_changes(previous_prices, current_prices)
-        if symbol:  # If a symbol is found with positive change
-            return [{'symbol': symbol, 'change': change}]
+            symbol, price, change = detect_positive_changes(previous_prices, current_prices)
+            if symbol:  # If a symbol is found with positive change
+                trade_fastest_currency(symbol)
+                # return [{'symbol': symbol, 'change': change}]
+            previous_prices = current_prices
+        except Exception as e:
+            logger.info(f"An error occurred in the trading loop: {e}")
             
 
 def fetch_mover_data(symbol):
@@ -216,13 +221,14 @@ def get_fastest_movers():
     return movers
 
 def main():
+    run()
     # trade_fastest_currency()
-    while True:
-        try:
-            # Execute the trading function
-            trade_fastest_currency()
-        except Exception as e:
-            logger.info(f"An error occurred in the trading loop: {e}")
+    # while True:
+    #     try:
+    #         # Execute the trading function
+    #         trade_fastest_currency()
+    #     except Exception as e:
+    #         logger.info(f"An error occurred in the trading loop: {e}")
 # Execute the trading function
 # if __name__ == "__main__":
 #     main()
