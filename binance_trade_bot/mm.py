@@ -180,6 +180,6 @@ def main():
         except Exception as e:
             logger.info(f"An error occurred in the trading loop: {e}")
 # Execute the trading function
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
 
