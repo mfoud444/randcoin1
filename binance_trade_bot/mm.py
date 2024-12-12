@@ -147,8 +147,8 @@ def detect_positive_changes(
             if previous_price > 0:
                 change = (current_price - previous_price) / previous_price
                 logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
-                if change > 0.2:
-                    logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
+                if change > 0.05:
+                    logger.info(f"Significant change detected for {symbol}: {change} exceeds threshold ")
                     return symbol, current_price, change
     return None, None, None
 
@@ -179,7 +179,7 @@ def run():
                 continue
 
             symbol, price, change = detect_positive_changes(previous_prices, current_prices)
-            if symbol:  # If a symbol is found with positive change
+            if change:  # If a symbol is found with positive change
                 trade_fastest_currency(symbol)
                 # return [{'symbol': symbol, 'change': change}]
             previous_prices = current_prices
