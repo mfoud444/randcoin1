@@ -147,7 +147,7 @@ def detect_positive_changes(
             if previous_price > 0:
                 change = (current_price - previous_price) / previous_price
                 logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
-                if change > 0.5:
+                if change > 0.2:
                     logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
                     return symbol, current_price, change
     return None, None, None
@@ -180,6 +180,8 @@ def run():
         symbol, price, change = detect_positive_changes(previous_prices, current_prices)
         if symbol:  # If a symbol is found with positive change
             return [{'symbol': symbol, 'change': change}]
+            
+        
         
         previous_prices = current_prices 
 # def fetch_mover_data(symbol):
