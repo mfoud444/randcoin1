@@ -158,7 +158,7 @@ def get_fastest_movers():
     usdt_symbols = [ticker['symbol'] for ticker in tickers if ticker['symbol'].endswith('USDT')]
 
     movers = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         # Create futures for each symbol
         futures = {executor.submit(fetch_mover_data, symbol): symbol for symbol in usdt_symbols}
 
