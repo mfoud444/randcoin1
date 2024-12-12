@@ -68,7 +68,7 @@ def adjust_price(price, tick_size):
 
 def trade_fastest_currency():
     # Step 1: Identify the fastest-growing currency
-    fastest_movers = run()  # Reuse the function from the previous script
+    fastest_movers = get_fastest_movers()  # Reuse the function from the previous script
     if not fastest_movers:
         logger.info("No fast movers found.")
         return
@@ -182,38 +182,38 @@ def run():
             return [{'symbol': symbol, 'change': change}]
             
 
-# def fetch_mover_data(symbol):
-#     """Fetch the price change data for a single symbol."""
-#     try:
-#         candles = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=10)
-#         start_price = float(candles[0][1])
-#         ticker = client.get_ticker(symbol=symbol)
-#         last_price = float(ticker['lastPrice'])
-#         percent_change = ((last_price - start_price) / start_price) * 100
-#         # logger.info(f"symbloy:{symbol}percent change:{percent_change}")
-#         if percent_change >= 1:
-#             return {'symbol': symbol, 'change': percent_change}
-#     except Exception as e:
-#         logger.info(f"Error fetching data for {symbol}: {e}")
-#     return None
+def fetch_mover_data(symbol):
+    """Fetch the price change data for a single symbol."""
+    try:
+        candles = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=10)
+        start_price = float(candles[0][1])
+        ticker = client.get_ticker(symbol=symbol)
+        last_price = float(ticker['lastPrice'])
+        percent_change = ((last_price - start_price) / start_price) * 100
+        # logger.info(f"symbloy:{symbol}percent change:{percent_change}")
+        if percent_change >= 1:
+            return {'symbol': symbol, 'change': percent_change}
+    except Exception as e:
+        logger.info(f"Error fetching data for {symbol}: {e}")
+    return None
 
-# def get_fastest_movers():
-#     tickers = client.get_ticker()
-#     usdt_symbols = [ticker['symbol'] for ticker in tickers if ticker['symbol'].endswith('USDT')]
+def get_fastest_movers():
+    tickers = client.get_ticker()
+    usdt_symbols = [ticker['symbol'] for ticker in tickers if ticker['symbol'].endswith('USDT')]
 
-#     movers = []
-#     with ThreadPoolExecutor(max_workers=6) as executor:
-#         # Create futures for each symbol
-#         futures = {executor.submit(fetch_mover_data, symbol): symbol for symbol in usdt_symbols}
+    movers = []
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        # Create futures for each symbol
+        futures = {executor.submit(fetch_mover_data, symbol): symbol for symbol in usdt_symbols}
 
-#         for future in as_completed(futures):
-#             result = future.result()
-#             if result:
-#                 movers.append(result)
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                movers.append(result)
 
-#     movers.sort(key=lambda x: x['change'], reverse=True)
-#     logger.info(movers)
-#     return movers
+    movers.sort(key=lambda x: x['change'], reverse=True)
+    logger.info(movers)
+    return movers
 
 def main():
     # trade_fastest_currency()
