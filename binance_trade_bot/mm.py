@@ -68,7 +68,7 @@ def adjust_price(price, tick_size):
 
 def trade_fastest_currency():
     # Step 1: Identify the fastest-growing currency
-    fastest_movers = get_fastest_movers()  # Reuse the function from the previous script
+    fastest_movers = fetch_mover_data()  # Reuse the function from the previous script
     if not fastest_movers:
         logger.info("No fast movers found.")
         return
