@@ -8,7 +8,7 @@ version: 1
 # - tgram://123456789:AABx8iXjE5C-vG4SDhf6ARgdFgxYxhuHb4A/-606743502
 # Rename the file to `apprise.yml`
 urls:
-  - tgram://8147801637:AAGMJ5JIfAqzsl4b7CXcgwNrFu0TzYZMSg8/-1002461963672
+  # - tgram://8147801637:AAGMJ5JIfAqzsl4b7CXcgwNrFu0TzYZMSg8/-1002461963672
   # - discord://WebhookID/WebhookToken/
   # - slack://tokenA/tokenB/tokenC
   # More options here: https://github.com/caronc/apprise
