@@ -26,7 +26,7 @@ def monitor_sell_order(symbol, order_id):
             if order_status['status'] == 'FILLED':
                 logger.info(f"Sell order {order_id} for {symbol} is filled.")
                 logger.info(f"Monitoring sell order {order_id}: Status {order_status['status']}")
-                trade_fastest_currency()  # Restart trading
+                
                 break
 
             # Wait before checking again
@@ -172,13 +172,13 @@ def get_fastest_movers():
     return movers
 
 def main():
-    trade_fastest_currency()
-    # while True:
-    #     try:
-    #         # Execute the trading function
-    #         trade_fastest_currency()
-    #     except Exception as e:
-    #         logger.info(f"An error occurred in the trading loop: {e}")
+    # trade_fastest_currency()
+    while True:
+        try:
+            # Execute the trading function
+            trade_fastest_currency()
+        except Exception as e:
+            logger.info(f"An error occurred in the trading loop: {e}")
 # Execute the trading function
 if __name__ == "__main__":
     main()
