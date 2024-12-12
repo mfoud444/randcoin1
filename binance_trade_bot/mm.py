@@ -6,7 +6,7 @@ from typing import Dict, Optional, Tuple
 # Reuse the get_fastest_movers() function here
 from concurrent.futures import ThreadPoolExecutor, as_completed
 TRADE_AMOUNT_USDT = 5.5  # Amount to trade in USDT
-PROFIT_TARGET = 0.01  # 5% profit target
+PROFIT_TARGET = 0.005  # 5% profit target
 TRADING_FEE = 0.001  # 0.1% per trade
 MONITOR_TIME=10
 # Set up your Binance API keys
@@ -147,7 +147,7 @@ def detect_positive_changes(
             if previous_price > 0:
                 change = (current_price - previous_price) / previous_price
                 logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
-                if change > 1:
+                if change > 0.5:
                     logger.info(f"Significant change detected for {symbol}: {change:.2%} exceeds threshold ")
                     return symbol, current_price, change
     return None, None, None
