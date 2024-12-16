@@ -87,12 +87,12 @@ class AutoTrader:
 
                 from_coin_price = self.manager.get_ticker_price(pair.from_coin + self.config.BRIDGE)
                 if from_coin_price is None:
-                    # self.logger.info(f"Skipping initializing {pair.from_coin + self.config.BRIDGE}, symbol not found")
+                    self.logger.info(f"Skipping initializing {pair.from_coin + self.config.BRIDGE}, symbol not found")
                     continue
 
                 to_coin_price = self.manager.get_ticker_price(pair.to_coin + self.config.BRIDGE)
                 if to_coin_price is None:
-                    # self.logger.info(f"Skipping initializing {pair.to_coin + self.config.BRIDGE}, symbol not found")
+                    self.logger.info(f"Skipping initializing {pair.to_coin + self.config.BRIDGE}, symbol not found")
                     continue
 
                 pair.ratio = from_coin_price / to_coin_price
