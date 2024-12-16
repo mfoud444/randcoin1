@@ -23,7 +23,7 @@ def main():
         logger.error("Couldn't access Binance API - API keys may be wrong or lack sufficient permissions")
         logger.error(e)
         return
-    coins_data = []
+    # coins_data = []
     # for coin in supported_coins:
     #     balance = manager.get_currency_balance(coin.symbol)
     #     usd_price = manager.get_ticker_price(f"{coin.symbol}{config.BRIDGE_SYMBOL}")
@@ -49,7 +49,7 @@ def main():
 
     logger.info("Creating database schema if it doesn't already exist")
     db.create_database()
-    config.SUPPORTED_COIN_LIST = manager.get_all_coins()
+    # config.SUPPORTED_COIN_LIST = manager.get_all_coins()
 
     db.set_coins(config.SUPPORTED_COIN_LIST)
     db.migrate_old_state()

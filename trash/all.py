@@ -221,3 +221,183 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
+    
+    
+    
+import os
+import ccxt
+import pandas as pd
+import numpy as np
+import asyncio
+import concurrent.futures
+from binance.client import Client
+from typing import List, Dict, Optional
+import warnings
+import nest_asyncio
+nest_asyncio.apply()
+warnings.filterwarnings('ignore')
+
+class BinanceTradeAnalyzer:
+    def __init__(
+        self, 
+        api_key: Optional[str] = None, 
+        api_secret: Optional[str] = None, 
+        specific_coins: Optional[List[str]] = None
+    ):
+        self.client = Client(api_key, api_secret, tld='us') if api_key and api_secret else Client()
+        self.specific_coins = specific_coins
+        
+        self.INTERVALS = 4
+        self.INTERVAL_MINUTES = 20
+        self.TRADING_FEE = 0.001  # 0.1% per trade
+        self.PROFIT_TARGET = 0.01  # 5% net profit target
+
+    def get_tradable_coins(self) -> List[str]:
+        """
+        Fetch USDT trading pairs, with option to use all or specific coins
+        """
+        if self.specific_coins:
+            return [coin.upper() + 'USDT' for coin in self.specific_coins if coin.upper() + 'USDT' in self.get_all_usdt_pairs()]
+        
+        return self.get_all_usdt_pairs()
+
+    def get_all_usdt_pairs(self) -> List[str]:
+        """
+        Retrieve all USDT trading pairs
+        """
+        exchange_info = self.client.get_exchange_info()
+        return [
+            symbol['symbol'] 
+            for symbol in exchange_info['symbols'] 
+            if symbol['symbol'].endswith('USDT') and symbol['status'] == 'TRADING'
+        ]
+
+    async def fetch_price_data(self, symbol: str) -> pd.DataFrame:
+        """
+        Fetch price data for a specific symbol across multiple intervals
+        """
+        try:
+            klines = self.client.get_klines(
+                symbol=symbol, 
+                interval=f'{self.INTERVAL_MINUTES}m', 
+                limit=self.INTERVALS
+            )
+            
+            df = pd.DataFrame(klines, columns=[
+                'Open Time', 'Open', 'High', 'Low', 'Close', 
+                'Volume', 'Close Time', 'Quote Asset Volume', 
+                'Number of Trades', 'Taker Buy Base Asset Volume', 
+                'Taker Buy Quote Asset Volume', 'Ignore'
+            ])
+            
+            df['Close'] = df['Close'].astype(float)
+            df['Percentage_Change'] = df['Close'].pct_change() * 100
+            df['Symbol'] = symbol
+            
+            return df
+        except Exception as e:
+            print(f"Error fetching data for {symbol}: {e}")
+            return pd.DataFrame()
+
+    def analyze_price_changes(self, dataframes: List[pd.DataFrame]) -> pd.DataFrame:
+        """
+        Compute price change statistics and assign points
+        """
+        analysis_results = []
+        
+        for df in dataframes:
+            if df.empty:
+                continue
+            
+            positive_changes = (df['Percentage_Change'] > 0).sum()
+            negative_changes = (df['Percentage_Change'] < 0).sum()
+            
+            coin_analysis = {
+                'Symbol': df['Symbol'].iloc[0],
+                'Positive_Changes': positive_changes,
+                'Negative_Changes': negative_changes,
+                'Net_Change': df['Percentage_Change'].sum(),
+                'Volatility': df['Percentage_Change'].std(),
+                'Points': positive_changes - negative_changes
+            }
+            
+            analysis_results.append(coin_analysis)
+        
+        return pd.DataFrame(analysis_results)
+
+    async def process_coins(self) -> pd.DataFrame:
+        """
+        Process all coins concurrently and analyze results
+        """
+        tradable_coins = self.get_tradable_coins()
+        
+        async def process_symbol(symbol):
+            return await self.fetch_price_data(symbol)
+        
+        async with asyncio.Semaphore(10):  # Limit concurrent requests
+            price_dataframes = await asyncio.gather(*[process_symbol(symbol) for symbol in tradable_coins])
+        
+        return self.analyze_price_changes(price_dataframes)
+
+    def simulate_investment(self, analysis_df: pd.DataFrame, initial_capital: float = 100) -> pd.DataFrame:
+        """
+        Simulate investment strategy with reinvestment and fee calculation
+        """
+        results = []
+        
+        for _, row in analysis_df.iterrows():
+            capital = initial_capital
+            for interval in range(self.INTERVALS):
+                profit_percentage = row['Points'] * 0.5  # Example profit calculation
+                
+                # Apply trading fee
+                net_profit = capital * (profit_percentage - self.TRADING_FEE)
+                capital += net_profit
+                
+                results.append({
+                    'Symbol': row['Symbol'],
+                    'Interval': interval + 1,
+                    'Capital': capital,
+                    'Profit_Percentage': profit_percentage
+                })
+        
+        return pd.DataFrame(results)
+
+    async def run_analysis(self) -> Dict[str, pd.DataFrame]:
+        """
+        Main method to run complete trading analysis
+        """
+        analysis_df = await self.process_coins()
+        
+        # Filter coins with more positive than negative changes
+        filtered_df = analysis_df[analysis_df['Points'] > 0]
+        
+        investment_simulation = self.simulate_investment(filtered_df)
+        
+        return {
+            'price_analysis': analysis_df,
+            'filtered_coins': filtered_df,
+            'investment_simulation': investment_simulation
+        }
+
+async def main():
+    # Example usage with optional specific coins
+    analyzer = BinanceTradeAnalyzer(
+        api_key=os.getenv('BINANCE_API_KEY'), 
+        api_secret=os.getenv('BINANCE_API_SECRET'),
+        specific_coins=['BTC', 'ETH', 'BNB']  # Optional: specify coins
+    )
+    
+    results = await analyzer.run_analysis()
+    
+    print("Price Analysis:")
+    print(results['price_analysis'])
+    print("\nFiltered Coins:")
+    print(results['filtered_coins'])
+    print("\nInvestment Simulation:")
+    print(results['investment_simulation'])
+
+if __name__ == '__main__':
+    asyncio.run(main())

@@ -52,7 +52,7 @@ class Strategy(AutoTrader):
             self.logger.info(f"Skipping scouting... current coin {current_coin + self.config.BRIDGE} not found")
             return
 
-        # self._jump_to_best_coin(current_coin, current_coin_price)
+        self._jump_to_best_coin(current_coin, current_coin_price)
 
     def bridge_scout(self):
         current_coin = self.db.get_current_coin()
